@@ -4,15 +4,10 @@ import { EventBus } from '../EventBus';
 export class Game extends Scene {
     constructor() {
         super('Game');
-        // Базовые размеры дизайна (9:16 - портретная ориентация)
-        this.DESIGN_WIDTH = 360;
-        this.DESIGN_HEIGHT = 640;
-        this.scaleFactor = 1;
-        this.currentWidth = this.DESIGN_WIDTH;
-        this.currentHeight = this.DESIGN_HEIGHT;
     }
 
     preload() {
+        // Убедитесь, что пути к ассетам верные
         this.load.setPath('assets');
         this.load.image('star', 'star.png');
         this.load.image('background', 'bg.png');
@@ -20,143 +15,87 @@ export class Game extends Scene {
     }
 
     create() {
-        // Инициализируем масштабирование
-        this.initScaling();
-        
-        // Добавляем игровые объекты
+        // 1. Создаем элементы один раз
         this.createGameObjects();
-        
-        // Настраиваем ресайз
-        this.setupResizeHandler();
-        
+
+        // 2. Слушаем событие изменения размера экрана (например, поворот телефона)
+        this.scale.on('resize', this.resize, this);
+
+        // 3. Сразу вызываем resize, чтобы всё встало на свои места
+        this.resize();
+
+        // Сообщаем React, что сцена готова
         EventBus.emit('current-scene-ready', this);
     }
 
-    initScaling() {
-        const canvas = this.sys.game.canvas;
-        const parent = canvas.parentElement;
-        
-        if (parent) {
-            this.currentWidth = parent.clientWidth;
-            this.currentHeight = parent.clientHeight;
-        }
-        
-        // Рассчитываем масштаб
-        this.scaleFactor = Math.min(
-            this.currentWidth / this.DESIGN_WIDTH,
-            this.currentHeight / this.DESIGN_HEIGHT
-        );
-        
-        // Настраиваем камеру
-        this.cameras.main.setViewport(
-            (this.currentWidth - this.DESIGN_WIDTH * this.scaleFactor) / 2,
-            (this.currentHeight - this.DESIGN_HEIGHT * this.scaleFactor) / 2,
-            this.DESIGN_WIDTH * this.scaleFactor,
-            this.DESIGN_HEIGHT * this.scaleFactor
-        );
-        
-        this.cameras.main.setZoom(this.scaleFactor);
-    }
-
     createGameObjects() {
-        // Все координаты указываем относительно DESIGN_WIDTH и DESIGN_HEIGHT
-        // Они будут автоматически масштабироваться
-        
-        // Фон
-        const bg = this.add.image(this.DESIGN_WIDTH / 2, this.DESIGN_HEIGHT / 2, 'background');
-        bg.setDisplaySize(this.DESIGN_WIDTH, this.DESIGN_HEIGHT);
-        
-        // Логотип
-        const logo = this.add.image(this.DESIGN_WIDTH / 2, this.DESIGN_HEIGHT / 2 - 100, 'logo');
-        logo.setScale(0.5 * this.scaleFactor);
-        logo.setDepth(100);
-        
-        // Текст
-        const text = this.add.text(
-            this.DESIGN_WIDTH / 2, 
-            this.DESIGN_HEIGHT - 150, 
-            'Make something fun!\nand share it with us:\nsupport@phaser.io', 
-            {
-                fontFamily: 'Arial Black',
-                fontSize: 20,
-                color: '#ffffff',
-                stroke: '#000000',
-                strokeThickness: 3,
-                align: 'center'
-            }
-        );
-        text.setOrigin(0.5);
-        text.setDepth(100);
-        
-        // Масштабируем текст
-        text.setScale(this.scaleFactor);
-        
-        // Пример интерактивного элемента
-        const star = this.add.image(this.DESIGN_WIDTH / 2, this.DESIGN_HEIGHT - 50, 'star');
-        star.setInteractive({ useHandCursor: true });
-        star.setScale(0.8 * this.scaleFactor);
-        
-        star.on('pointerdown', () => {
-            this.tweens.add({
-                targets: star,
-                scale: star.scale * 1.2,
-                duration: 100,
-                yoyo: true
+        // Создаем фон (без позиции, её задаст resize)
+        this.bg = this.add.image(0, 0, 'background');
+
+        // Создаем логотип
+        this.logo = this.add.image(0, 0, 'logo').setDepth(100);
+
+        // Создаем текст
+        this.uiText = this.add.text(0, 0, 'Telegram Web App\nGame', {
+            fontFamily: 'Arial Black',
+            fontSize: 38,
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 8,
+            align: 'center'
+        }).setOrigin(0.5).setDepth(100);
+
+        // Создаем группу для звезд
+        this.stars = this.add.group();
+        for (let i = 0; i < 15; i++) {
+            const star = this.add.image(0, 0, 'star').setInteractive({ useHandCursor: true });
+            
+            star.on('pointerdown', () => {
+                this.tweens.add({
+                    targets: star,
+                    scale: star.scale * 1.5,
+                    duration: 200,
+                    yoyo: true,
+                    ease: 'Back.easeOut'
+                });
             });
-        });
+            this.stars.add(star);
+        }
     }
 
-    setupResizeHandler() {
-        // Обработчик изменения размера окна
-        this.scale.on('resize', (gameSize) => {
-            this.handleResize(gameSize);
-        });
-        
-        // Обработчик кастомного события resize
-        EventBus.on('resize', (data) => {
-            this.handleResize({
-                width: data.width,
-                height: data.height
-            });
-        });
-    }
+    // Эта функция отвечает за расстановку объектов при любом размере экрана
+    resize() {
+        const { width, height } = this.scale;
+        const centerX = width / 2;
+        const centerY = height / 2;
 
-    handleResize(gameSize) {
-        // Обновляем текущие размеры
-        this.currentWidth = gameSize.width;
-        this.currentHeight = gameSize.height;
-        
-        // Пересчитываем масштаб
-        this.scaleFactor = Math.min(
-            this.currentWidth / this.DESIGN_WIDTH,
-            this.currentHeight / this.DESIGN_HEIGHT
-        );
-        
-        // Обновляем вьюпорт камеры
-        this.cameras.main.setViewport(
-            (this.currentWidth - this.DESIGN_WIDTH * this.scaleFactor) / 2,
-            (this.currentHeight - this.DESIGN_HEIGHT * this.scaleFactor) / 2,
-            this.DESIGN_WIDTH * this.scaleFactor,
-            this.DESIGN_HEIGHT * this.scaleFactor
-        );
-        
-        // Обновляем зум
-        this.cameras.main.setZoom(this.scaleFactor);
-        
-        // Центрируем камеру
-        this.cameras.main.centerOn(this.DESIGN_WIDTH / 2, this.DESIGN_HEIGHT / 2);
-        
-        // Опционально: можно обновить позиции некоторых объектов
-        // this.updateGameObjects();
-    }
+        // --- 1. Адаптация фона (Эффект Cover) ---
+        this.bg.setPosition(centerX, centerY);
+        const scaleX = width / this.bg.width;
+        const scaleY = height / this.bg.height;
+        const maxScale = Math.max(scaleX, scaleY);
+        this.bg.setScale(maxScale);
 
-    updateGameObjects() {
-        // Если нужно обновлять позиции объектов при ресайзе
-        // Например, для адаптивного UI
-        const children = this.children.getChildren();
-        children.forEach(child => {
-            if (child.type === 'Text') {
-                child.setScale(this.scaleFactor);
+        // --- 2. Позиционирование лого и текста ---
+        this.logo.setPosition(centerX, centerY - 100);
+        // Масштабируем лого, чтобы оно не было огромным на планшетах
+        const logoScale = Math.min(width / 800, 1); 
+        this.logo.setScale(logoScale);
+
+        this.uiText.setPosition(centerX, height - 150);
+        this.uiText.setFontSize(Math.max(24, 38 * logoScale));
+
+        // --- 3. Раскидываем звезды по экрану ---
+        this.stars.getChildren().forEach((star) => {
+            // Если звезда еще не имеет позиции, даем ей случайную
+            if (star.x === 0) {
+                star.setPosition(
+                    Phaser.Math.Between(50, width - 50),
+                    Phaser.Math.Between(50, height - 50)
+                );
+            } else {
+                // Если экран изменился, просто сдвигаем их пропорционально (опционально)
+                // Для простоты здесь просто оставим как есть или перегенерируем
             }
         });
     }

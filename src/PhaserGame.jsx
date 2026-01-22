@@ -1,19 +1,9 @@
 import { forwardRef, useEffect, useLayoutEffect, useRef } from 'react';
-import StartGame from './game/main'; // Здесь StartGame импортируется как default
+import StartGame from './game/main';
 import { EventBus } from './game/EventBus';
 
 export const PhaserGame = forwardRef(function PhaserGame({ currentActiveScene }, ref) {
     const game = useRef();
-
-    // Стили контейнера: на мобильных — весь экран, на ПК — ограничение
-    const containerStyle = {
-        width: '100%',
-        height: '100%',
-        maxWidth: '600px', // Ограничиваем ширину на ПК
-        maxHeight: '100vh',
-        margin: '0 auto',
-        display: 'block'
-    };
 
     useLayoutEffect(() => {
         if (game.current === undefined) {
@@ -48,9 +38,7 @@ export const PhaserGame = forwardRef(function PhaserGame({ currentActiveScene },
     }, [currentActiveScene, ref]);
 
     return (
-        /* Внешний оберточный блок делает черный фон для "полос" по бокам на ПК */
-        <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000', display: 'flex', justifyContent: 'center' }}>
-            <div id="game-container" style={containerStyle}></div>
-        </div>
+        // Контейнер просто занимает 100% доступного места
+        <div id="game-container" style={{ width: '100%', height: '100%' }}></div>
     );
 });

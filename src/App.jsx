@@ -1,6 +1,9 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { PhaserGame } from './PhaserGame';
 import { EventBus } from './game/EventBus';
+import ControlPanel from './components/GameUI/ControlPanel';
+import HistoryPanel from './components/GameUI/HistoryPanel';
+import SettingsPanel from './components/GameUI/SettingsPanel';
 
 const SCRIPT = [
     { text: "(Дверь открывается...)", bg: 'bg_door', name: "" },
@@ -12,8 +15,18 @@ const SCRIPT = [
     { text: "А к выпуску ты выйдешь на старт карьеры с готовой стратегией роста.", bg: 'bg_office', character: 'kotik_normal', name: "Котик" },
     { text: "В умелых лапах они становятся магией, превращающей мечту в план, а план — в судьбу.", bg: 'bg_office', character: 'kotik_normal', name: "Котик" },
     { text: "Однако их истинную силу можно постичь только на практике, в деле... или в настоящем приключении.", bg: 'bg_office', character: 'kotik_normal', name: "Котик" },
-    { text: "Поэтому я предлагаю тебе не семинар. Я предлагаю экспедицию.", bg: 'bg_office', character: 'kotik_normal', name: "Котик", showChoices: true },
-    // Реплики после выбора
+    { 
+        text: "Поэтому я предлагаю тебе не семинар. Я предлагаю экспедицию.", 
+        bg: 'bg_office', 
+        character: 'kotik_normal', 
+        name: "Котик", 
+        showChoices: true,
+        choices: [
+            { text: "Конечно! Я готов к приключениям." },
+            { text: "Путешествие? Звучит интригующе." },
+            { text: "Ладно, почему бы и нет. Давайте попробуем." }
+        ]
+    },
     { text: "Вот так-то лучше!", bg: 'bg_magic_office', character: 'kotik_wizard', name: "Котик", flash: true },
     { text: "В каждом деле, особенно в таком важном, как поиск своего пути, без капельки волшебства не обойтись.", bg: 'bg_magic_office', character: 'kotik_wizard', name: "Котик" },
     { text: "Здесь, в этом лесу возможностей, я — не просто наставник. Я — Волшебник Карьерных Дорог.", bg: 'bg_magic_office', character: 'kotik_wizard', name: "Котик" },
@@ -28,14 +41,23 @@ function App() {
     const [step, setStep] = useState(0);
     const [displayText, setDisplayText] = useState("");
     const [isTyping, setIsTyping] = useState(false);
+    
+    const [isAuto, setIsAuto] = useState(false);
+    const [isSkip, setIsSkip] = useState(false);
+    const [history, setHistory] = useState([]);
+    const [showHistory, setShowHistory] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
+    const [settings, setSettings] = useState({ textSpeed: 25, fontSize: 18 });
+
     const typingTimer = useRef(null);
 
     const startTyping = (text) => {
-        if (!text) return;
-        clearInterval(typingTimer.current);
+        if (typingTimer.current) clearInterval(typingTimer.current);
         setDisplayText("");
         setIsTyping(true);
         let i = 0;
+        const speed = isSkip ? 1 : settings.textSpeed;
+
         typingTimer.current = setInterval(() => {
             i++;
             setDisplayText(text.substring(0, i));
@@ -43,101 +65,170 @@ function App() {
                 clearInterval(typingTimer.current);
                 setIsTyping(false);
             }
-        }, 25);
+        }, speed);
     };
 
-    useEffect(() => {
-        if (SCRIPT[step].text) {
-            startTyping(SCRIPT[step].text);
-            EventBus.emit('update-visuals', {
-                bg: SCRIPT[step].bg,
-                character: SCRIPT[step].character,
-                flash: SCRIPT[step].flash
-            });
-        }
-        return () => clearInterval(typingTimer.current);
-    }, [step]);
-
-    const handleNext = () => {
-        // Если текст еще печатается — скипаем анимацию
-        if (isTyping) {
-            clearInterval(typingTimer.current);
-            setDisplayText(SCRIPT[step].text);
+    const handleNext = useCallback(() => {
+        // Если текст печатается, при клике показываем его целиком
+        if (isTyping && !isSkip) {
+            setDisplayText(SCRIPT[step].text || "");
             setIsTyping(false);
+            if (typingTimer.current) clearInterval(typingTimer.current);
             return;
         }
 
-        // Если текст закончен, но это экран выбора — не листаем кликом по экрану
-        if (SCRIPT[step].showChoices) return;
+        // Если экран выбора или конец - блокируем переход по клику на экран
+        if (SCRIPT[step].showChoices || SCRIPT[step].end) {
+            return;
+        }
 
-        // Если текст закончен и это конец — ничего не делаем
-        if (SCRIPT[step].end) return;
-
-        // Переход к следующему шагу
         if (step < SCRIPT.length - 1) {
-            setStep(step + 1);
+            setStep(s => s + 1);
+        }
+    }, [step, isTyping, isSkip]);
+
+    useEffect(() => {
+        const line = SCRIPT[step];
+        if (line) {
+            if (line.text) {
+                startTyping(line.text);
+                
+                // Исправление истории: обрезаем её до текущего шага, чтобы не было дублей при "Назад"
+                setHistory(prev => {
+                    const cleanHistory = prev.slice(0, step);
+                    return [...cleanHistory, { name: line.name, text: line.text, isChoice: false }];
+                });
+            }
+            
+            // Отправляем команду в Phaser
+            EventBus.emit('update-visuals', { ...line });
+        }
+    }, [step]);
+
+    const onAction = (type) => {
+        if (type === 'auto') { setIsSkip(false); setIsAuto(!isAuto); }
+        if (type === 'skip') { setIsAuto(false); setIsSkip(!isSkip); }
+        if (type === 'history') setShowHistory(true);
+        if (type === 'settings') setShowSettings(true);
+        if (type === 'back' && step > 0) {
+            setIsAuto(false); 
+            setIsSkip(false);
+            setStep(prev => prev - 1);
         }
     };
 
     return (
-        <div style={containerStyle} onPointerDown={handleNext}>
-            <style>
-                {`
-                @keyframes fadeInFade { from { opacity: 0; } to { opacity: 1; } }
-                @keyframes slideUp { 
-                    from { opacity: 0; transform: translateY(20px); } 
-                    to { opacity: 1; transform: translateY(0); } 
-                }
-                `}
-            </style>
+        <div style={containerStyle}>
+            <div style={gameWrapperStyle} onPointerDown={() => {if (!isAuto && !isSkip){handleNext()}}}>
+                <PhaserGame ref={phaserRef} />
+                
+                {/* Скрываем диалог, если это экран "end" */}
+                {!SCRIPT[step].end && (
+                    <div style={{...dialogBoxStyle, fontSize: `${settings.fontSize}px`}}>
+                        {SCRIPT[step].name && <div style={nameStyle}>{SCRIPT[step].name}</div>}
+                        <div style={{lineHeight: '1.4'}}>{displayText}</div>
+                    </div>
+                )}
 
-            <PhaserGame ref={phaserRef} />
-            
-            {!SCRIPT[step].end && (
-                <div style={dialogBoxStyle}>
-                    {SCRIPT[step].name && <div style={nameStyle}>{SCRIPT[step].name}</div>}
-                    <div style={textStyle}>{displayText}</div>
-                </div>
-            )}
+                <ControlPanel 
+                    onAction={onAction} 
+                    states={{ isAuto, isSkip }} 
+                    isTyping={isTyping}
+                    currentStep={step}
+                    handleNext={handleNext}
+                />
 
-            {/* ВЫБОР: появляется только когда !isTyping (текст завершен) */}
-            {SCRIPT[step].showChoices && !isTyping && (
-                <div style={choicesOverlayStyle}>
-                    <button style={btnStyle} onClick={(e) => { e.stopPropagation(); setStep(step + 1); }}>Конечно! Я готов к приключениям.</button>
-                    <button style={btnStyle} onClick={(e) => { e.stopPropagation(); setStep(step + 1); }}>Путешествие? Звучит интригующе.</button>
-                    <button style={btnStyle} onClick={(e) => { e.stopPropagation(); setStep(step + 1); }}>Ладно, почему бы и нет.</button>
-                </div>
-            )}
+                {showHistory && <HistoryPanel history={history} onClose={() => setShowHistory(false)} />}
+                {showSettings && <SettingsPanel settings={settings} setSettings={setSettings} onClose={() => setShowSettings(false)} />}
 
-            {SCRIPT[step].end && (
-                <div style={endOverlayStyle}>
-                    <h1 style={endTextStyle}>Создание персонажа в разработке</h1>
-                </div>
-            )}
+                {/* Выбор вариантов */}
+                {SCRIPT[step].showChoices && !isTyping && (
+                    <div style={choicesStyle} onPointerDown={e => e.stopPropagation()}>
+                        <div style={choicesContainerStyle}>
+                            {SCRIPT[step].choices.map((choice, index) => (
+                                <button 
+                                    key={index} 
+                                    style={btnChoice} 
+                                    onClick={() => {
+                                        setHistory(prev => [...prev, { text: choice.text, isChoice: true }]);
+                                        setStep(step + 1);
+                                    }}
+                                >
+                                    {choice.text}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
 
 // Стили
-const containerStyle = { width: '100vw', height: '100vh', position: 'relative', backgroundColor: '#000', cursor: 'pointer', overflow: 'hidden' };
-const dialogBoxStyle = { position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', width: '90%', maxWidth: '600px', minHeight: '100px', backgroundColor: 'rgba(0, 0, 0, 0.75)', borderRadius: '15px', padding: '20px 25px', color: 'white', fontFamily: 'sans-serif', pointerEvents: 'none', zIndex: 10 };
-const nameStyle = { color: '#ffcc00', fontWeight: 'bold', marginBottom: '8px', fontSize: '1.2rem' };
-const textStyle = { fontSize: '1.05rem', lineHeight: '1.5' };
-
-const choicesOverlayStyle = { 
-    position: 'absolute', inset: 0, 
-    display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', 
-    backgroundColor: 'rgba(0,0,0,0.4)', gap: '12px', zIndex: 100,
-    animation: 'fadeInFade 0.5s ease-out' // Плавное появление фона выбора
+const containerStyle = { 
+    width: '100vw', 
+    height: '100vh', 
+    backgroundColor: '#000', 
+    display: 'flex', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    overflow: 'hidden' 
 };
 
-const btnStyle = { 
-    padding: '15px 25px', width: '320px', borderRadius: '12px', border: 'none', 
-    background: '#028af8', color: 'white', cursor: 'pointer', fontSize: '0.95rem',
-    animation: 'slideUp 0.4s ease-out' // Кнопки мягко "всплывают"
+const gameWrapperStyle = { 
+    width: '100%', 
+    height: '100%', 
+    position: 'relative', 
+    overflow: 'hidden' 
 };
 
-const endOverlayStyle = { position: 'absolute', inset: 0, backgroundColor: '#000', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, animation: 'fadeInFade 1.5s ease-in-out forwards' };
-const endTextStyle = { color: 'white', fontFamily: 'sans-serif', fontSize: '1.5rem', textAlign: 'center', animation: 'fadeInFade 2.5s ease-in-out forwards' };
+const dialogBoxStyle = { 
+    position: 'absolute', 
+    bottom: 'max(70px, env(safe-area-inset-bottom))', 
+    left: '50%', 
+    transform: 'translateX(-50%)', 
+    width: '95%', 
+    maxWidth: '650px', 
+    backgroundColor: 'rgba(0, 0, 0, 0.85)', 
+    borderRadius: '12px', 
+    padding: '18px 22px', 
+    color: 'white', 
+    zIndex: 10, 
+    boxSizing: 'border-box', 
+    pointerEvents: 'none', 
+    border: '1px solid rgba(255, 255, 255, 0.15)' 
+};
+
+const nameStyle = { color: '#ffcc00', fontWeight: 'bold', marginBottom: '6px', fontSize: '1.1em' };
+
+const choicesStyle = { 
+    position: 'absolute', 
+    inset: 0, 
+    display: 'flex', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    zIndex: 110 
+};
+
+const choicesContainerStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    width: '85%',
+    maxWidth: '400px'
+};
+
+const btnChoice = { 
+    padding: '16px 20px', 
+    borderRadius: '10px', 
+    border: '1px solid rgba(255,255,255,0.2)', 
+    background: 'linear-gradient(180deg, #028af8 0%, #026dc5 100%)', 
+    color: 'white', 
+    fontWeight: 'bold', 
+    cursor: 'pointer', 
+    fontSize: '16px' 
+};
 
 export default App;

@@ -63,7 +63,8 @@ const overlayStyle = {
     zIndex: 2000, 
     display: 'flex', 
     justifyContent: 'center', 
-    alignItems: 'center' 
+    alignItems: 'center',
+    pointerEvents: 'auto' // <--- ДОБАВЛЕНО: Исправляет проблему с кликами
 };
 
 const windowStyle = { 

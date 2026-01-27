@@ -1,9 +1,9 @@
 import { Scene } from 'phaser';
 import { EventBus } from '../EventBus';
 
-export class Game extends Scene {
+export class Greeting extends Scene {
     constructor() {
-        super('Game');
+        super('Greeting');
     }
 
     preload() {

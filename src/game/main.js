@@ -1,4 +1,4 @@
-import { Game as MainGame } from './scenes/Game';
+import { Greeting as Scene1 } from './scenes/Greeting';
 import { AUTO, Scale, Game } from 'phaser';
 
 const config = {
@@ -18,7 +18,7 @@ const config = {
         antialias: true,
         pixelArt: false
     },
-    scene: [MainGame]
+    scene: [Scene1]
 };
 
 const StartGame = (parent) => {

@@ -16,9 +16,10 @@ const ClassSelector = ({ onClassSelect }) => {
     const isDragging = useRef(false);
     const startX = useRef(0);
 
-    // --- ПРОВЕРКА ПУТЕЙ ---
-    // На Vercel лучше использовать абсолютный путь от корня public
-    const getAssetPath = (name) => `assets/${name}.png`;
+    // ВАЖНО: На Vercel путь должен начинаться с "/" (относительно папки public)
+    const getAssetPath = (iconName) => `/${iconName}.png`; 
+    // Если твои картинки в public/assets, используй: `/${iconName}.png`
+    // Убедись, что файлы лежат ПРЯМО в public/ (или поправь путь ниже)
 
     useEffect(() => {
         cardsRef.current.forEach((card, i) => {
@@ -32,12 +33,11 @@ const ClassSelector = ({ onClassSelect }) => {
 
             const isCenter = i === activeIndex;
 
-            // Анимация карт
             gsap.to(card, {
-                x: diff * (window.innerWidth < 500 ? 220 : 280), // Адаптивный шаг для мобилок
+                x: diff * (window.innerWidth < 500 ? 220 : 280), 
                 z: isCenter ? 100 : -400,
                 rotationY: isCenter ? (isFlipped ? 180 : 0) : diff * 40,
-                scale: isCenter ? 1 : 0.7, // Чуть меньше боковые карты для мобилок
+                scale: isCenter ? 1 : 0.75,
                 opacity: Math.abs(diff) > 1.1 ? 0 : (isCenter ? 1 : 0.4),
                 zIndex: isCenter ? 100 : 50 - Math.abs(diff) * 10,
                 duration: 0.6,
@@ -48,7 +48,7 @@ const ClassSelector = ({ onClassSelect }) => {
                 if (isCenter) {
                     gsap.to(glow, {
                         opacity: 1,
-                        boxShadow: "0 0 25px 5px rgba(255, 204, 0, 0.6)", 
+                        boxShadow: "0 0 20px 5px rgba(255, 204, 0, 0.6)", 
                         duration: 0.6
                     });
                 } else {
@@ -57,9 +57,6 @@ const ClassSelector = ({ onClassSelect }) => {
             }
         });
     }, [activeIndex, isFlipped]);
-
-    const handleNext = () => { setIsFlipped(false); setActiveIndex(p => (p + 1) % CLASSES.length); };
-    const handlePrev = () => { setIsFlipped(false); setActiveIndex(p => (p - 1 + CLASSES.length) % CLASSES.length); };
 
     const onStart = (e) => { 
         isDragging.current = true;
@@ -70,8 +67,9 @@ const ClassSelector = ({ onClassSelect }) => {
         if (!isDragging.current) return;
         const currentX = e.clientX || (e.touches && e.touches[0].clientX);
         const dist = startX.current - currentX;
-        if (Math.abs(dist) > 50) { // Чуть чувствительнее для тача
-            dist > 0 ? handleNext() : handlePrev();
+        if (Math.abs(dist) > 50) {
+            dist > 0 ? setActiveIndex(p => (p + 1) % CLASSES.length) : setActiveIndex(p => (p - 1 + CLASSES.length) % CLASSES.length);
+            setIsFlipped(false);
             isDragging.current = false;
         }
     };
@@ -94,7 +92,7 @@ const ClassSelector = ({ onClassSelect }) => {
                             {/* ЛИЦО */}
                             <div style={{ 
                                 ...commonFace, 
-                                backgroundImage: `url(${getAssetPath(cls.icon)})` 
+                                backgroundImage: `url("/assets/${cls.icon}.png")` 
                             }}>
                                 <div style={labelNameTop}>{cls.name.toUpperCase()}</div>
                             </div>
@@ -102,7 +100,7 @@ const ClassSelector = ({ onClassSelect }) => {
                             <div style={{ 
                                 ...commonFace, 
                                 ...backFaceStyle, 
-                                backgroundImage: `url(${getAssetPath('card_back')})` 
+                                backgroundImage: `url("/assets/card_back.png")` 
                             }}>
                                 <div style={backContent}>
                                     <h2 style={innerTitleStyle}>{cls.name}</h2>
@@ -115,7 +113,6 @@ const ClassSelector = ({ onClassSelect }) => {
             </div>
 
             <div style={uiLayer}>
-                <p style={hintText}>{isFlipped ? "Выбор сделан?" : "Свайпай и нажми, чтобы перевернуть"}</p>
                 <button 
                     style={{ ...confirmBtnStyle, opacity: isFlipped ? 1 : 0, pointerEvents: isFlipped ? 'auto' : 'none' }}
                     onClick={(e) => { e.stopPropagation(); onClassSelect(CLASSES[activeIndex]); }}
@@ -127,7 +124,7 @@ const ClassSelector = ({ onClassSelect }) => {
     );
 };
 
-// --- ОБНОВЛЕННЫЕ СТИЛИ ДЛЯ МОБИЛОК ---
+// Стили
 const isMobile = window.innerWidth < 500;
 const cardW = isMobile ? 220 : 260; 
 const cardH = isMobile ? 366 : 433;
@@ -137,15 +134,14 @@ const overlayStyle = { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,
 const carouselViewport = { position: 'relative', width: `${cardW}px`, height: `${cardH}px`, perspective: '1200px' };
 const cardWrapper = { position: 'absolute', width: '100%', height: '100%', cursor: 'pointer', transformStyle: 'preserve-3d' };
 const cardInner = { position: 'relative', width: '100%', height: '100%', transformStyle: 'preserve-3d', pointerEvents: 'none' };
-const commonFace = { position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden', borderRadius: '20px', backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid rgba(255,255,255,0.1)' };
-const glowLayerStyle = { position: 'absolute', inset: '2px', borderRadius: '20px', backgroundColor: 'rgba(255, 204, 0, 0.1)', pointerEvents: 'none', zIndex: -1, opacity: 0 };
+const commonFace = { position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden', borderRadius: '20px', backgroundSize: 'cover', backgroundPosition: 'center' };
+const glowLayerStyle = { position: 'absolute', inset: '2px', borderRadius: '20px', backgroundColor: 'rgba(255, 204, 0, 0.15)', pointerEvents: 'none', zIndex: -1, opacity: 0 };
 const backFaceStyle = { transform: 'rotateY(180deg)' };
-const labelNameTop = { position: 'absolute', top: '15px', left: '50%', transform: 'translateX(-50%)', background: '#ffcc00', color: '#000', padding: '6px 18px', borderRadius: '10px', fontWeight: '900', fontSize: '12px', whiteSpace: 'nowrap' };
-const backContent = { height: '100%', padding: '15px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', boxSizing: 'border-box' };
-const innerTitleStyle = { color: '#ffcc00', fontSize: '18px', marginBottom: '10px', textTransform: 'uppercase' };
-const descText = { color: '#fff', fontSize: '14px', lineHeight: '1.3' };
+const labelNameTop = { position: 'absolute', top: '15px', left: '50%', transform: 'translateX(-50%)', background: '#ffcc00', color: '#000', padding: '6px 18px', borderRadius: '10px', fontWeight: '900', fontSize: '12px' };
+const backContent = { height: '100%', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', boxSizing: 'border-box' };
+const innerTitleStyle = { color: '#ffcc00', fontSize: '18px', marginBottom: '10px' };
+const descText = { color: '#fff', fontSize: '14px', lineHeight: '1.4' };
 const uiLayer = { position: 'absolute', bottom: isMobile ? '30px' : '60px', textAlign: 'center', width: '100%' };
-const hintText = { color: 'rgba(255,255,255,0.6)', fontSize: '11px', marginBottom: '10px' };
 const confirmBtnStyle = { padding: '14px 40px', borderRadius: '30px', border: 'none', background: '#ffcc00', color: '#000', fontWeight: '900', fontSize: '15px', cursor: 'pointer' };
 
 export default ClassSelector;

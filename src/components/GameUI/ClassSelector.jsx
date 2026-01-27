@@ -12,19 +12,13 @@ const ClassSelector = ({ onClassSelect }) => {
     const [activeIndex, setActiveIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const cardsRef = useRef([]);
-    const glowsRef = useRef([]); 
     const isDragging = useRef(false);
     const startX = useRef(0);
 
-    // ВАЖНО: На Vercel путь должен начинаться с "/" (относительно папки public)
-    const getAssetPath = (iconName) => `/${iconName}.png`; 
-    // Если твои картинки в public/assets, используй: `/${iconName}.png`
-    // Убедись, что файлы лежат ПРЯМО в public/ (или поправь путь ниже)
-
+    // --- ЛОГИКА АНИМАЦИИ И ПОДСВЕТКИ (GSAP) ---
     useEffect(() => {
         cardsRef.current.forEach((card, i) => {
             if (!card) return;
-            const glow = glowsRef.current[i];
             
             let diff = i - activeIndex;
             const len = CLASSES.length;
@@ -33,33 +27,43 @@ const ClassSelector = ({ onClassSelect }) => {
 
             const isCenter = i === activeIndex;
 
+            // Движение, вращение и базовая подсветка
             gsap.to(card, {
-                x: diff * (window.innerWidth < 500 ? 220 : 280), 
+                x: diff * 280, 
                 z: isCenter ? 100 : -400,
                 rotationY: isCenter ? (isFlipped ? 180 : 0) : diff * 40,
-                scale: isCenter ? 1 : 0.75,
+                scale: isCenter ? 1 : 0.8,
                 opacity: Math.abs(diff) > 1.1 ? 0 : (isCenter ? 1 : 0.4),
                 zIndex: isCenter ? 100 : 50 - Math.abs(diff) * 10,
                 duration: 0.6,
-                ease: "expo.out"
+                ease: "expo.out",
+                overwrite: true,
+                boxShadow: isCenter 
+                    ? "0 0 35px 10px rgba(255, 204, 0, 0.5), 0 25px 50px rgba(0,0,0,0.8)" 
+                    : "0 0 0px 0px rgba(0,0,0,0), 0 10px 30px rgba(0,0,0,0.5)"
             });
 
-            if (glow) {
-                if (isCenter) {
-                    gsap.to(glow, {
-                        opacity: 1,
-                        boxShadow: "0 0 20px 5px rgba(255, 204, 0, 0.6)", 
-                        duration: 0.6
-                    });
-                } else {
-                    gsap.to(glow, { opacity: 0, boxShadow: "0 0 0px 0px rgba(255, 204, 0, 0)", duration: 0.3 });
-                }
+            // Эффект пульсации "дыхание света" для активной карты
+            if (isCenter) {
+                gsap.to(card, {
+                    boxShadow: "0 0 55px 15px rgba(255, 204, 0, 0.6), 0 25px 50px rgba(0,0,0,0.8)",
+                    duration: 1.5,
+                    repeat: -1,
+                    yoyo: true,
+                    ease: "sine.inOut"
+                });
+            } else {
+                gsap.killTweensOf(card, "boxShadow"); 
             }
         });
     }, [activeIndex, isFlipped]);
 
+    // --- УПРАВЛЕНИЕ ---
+    const handleNext = () => { setIsFlipped(false); setActiveIndex(p => (p + 1) % CLASSES.length); };
+    const handlePrev = () => { setIsFlipped(false); setActiveIndex(p => (p - 1 + CLASSES.length) % CLASSES.length); };
+
     const onStart = (e) => { 
-        isDragging.current = true;
+        isDragging.current = true; 
         startX.current = e.clientX || (e.touches && e.touches[0].clientX); 
     };
 
@@ -67,9 +71,8 @@ const ClassSelector = ({ onClassSelect }) => {
         if (!isDragging.current) return;
         const currentX = e.clientX || (e.touches && e.touches[0].clientX);
         const dist = startX.current - currentX;
-        if (Math.abs(dist) > 50) {
-            dist > 0 ? setActiveIndex(p => (p + 1) % CLASSES.length) : setActiveIndex(p => (p - 1 + CLASSES.length) % CLASSES.length);
-            setIsFlipped(false);
+        if (Math.abs(dist) > 70) {
+            dist > 0 ? handleNext() : handlePrev();
             isDragging.current = false;
         }
     };
@@ -85,34 +88,28 @@ const ClassSelector = ({ onClassSelect }) => {
                 {CLASSES.map((cls, i) => (
                     <div key={cls.id} ref={el => cardsRef.current[i] = el} style={cardWrapper} 
                          onClick={() => i === activeIndex && setIsFlipped(!isFlipped)}>
-                        
-                        <div ref={el => glowsRef.current[i] = el} style={glowLayerStyle} />
-
                         <div style={cardInner}>
-                            {/* ЛИЦО */}
-                            <div style={{ 
-                                ...commonFace, 
-                                backgroundImage: `url("/assets/${cls.icon}.png")` 
-                            }}>
+                            
+                            {/* ЛИЦЕВАЯ СТОРОНА */}
+                            <div style={{ ...commonFace, backgroundImage: `url(assets/${cls.icon}.png)` }}>
                                 <div style={labelNameTop}>{cls.name.toUpperCase()}</div>
                             </div>
-                            {/* РУБАШКА */}
-                            <div style={{ 
-                                ...commonFace, 
-                                ...backFaceStyle, 
-                                backgroundImage: `url("/assets/card_back.png")` 
-                            }}>
+
+                            {/* ОБРАТНАЯ СТОРОНА */}
+                            <div style={{ ...commonFace, ...backFaceStyle, backgroundImage: `url(assets/card_back.png)` }}>
                                 <div style={backContent}>
                                     <h2 style={innerTitleStyle}>{cls.name}</h2>
                                     <p style={descText}>{cls.desc}</p>
                                 </div>
                             </div>
+
                         </div>
                     </div>
                 ))}
             </div>
 
             <div style={uiLayer}>
+                <p style={hintText}>{isFlipped ? "Выбор сделан?" : "Нажми на карту, чтобы перевернуть"}</p>
                 <button 
                     style={{ ...confirmBtnStyle, opacity: isFlipped ? 1 : 0, pointerEvents: isFlipped ? 'auto' : 'none' }}
                     onClick={(e) => { e.stopPropagation(); onClassSelect(CLASSES[activeIndex]); }}
@@ -124,24 +121,50 @@ const ClassSelector = ({ onClassSelect }) => {
     );
 };
 
-// Стили
-const isMobile = window.innerWidth < 500;
-const cardW = isMobile ? 220 : 260; 
-const cardH = isMobile ? 366 : 433;
+// --- СТИЛИ ---
+const cardW = 260; 
+const cardH = (1280 / 768) * cardW;
 
-const containerStyle = { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', touchAction: 'none' };
+const containerStyle = { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', touchAction: 'none' };
 const overlayStyle = { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: -1 };
 const carouselViewport = { position: 'relative', width: `${cardW}px`, height: `${cardH}px`, perspective: '1200px' };
-const cardWrapper = { position: 'absolute', width: '100%', height: '100%', cursor: 'pointer', transformStyle: 'preserve-3d' };
+const cardWrapper = { position: 'absolute', width: '100%', height: '100%', cursor: 'grab', transformStyle: 'preserve-3d' };
 const cardInner = { position: 'relative', width: '100%', height: '100%', transformStyle: 'preserve-3d', pointerEvents: 'none' };
-const commonFace = { position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden', borderRadius: '20px', backgroundSize: 'cover', backgroundPosition: 'center' };
-const glowLayerStyle = { position: 'absolute', inset: '2px', borderRadius: '20px', backgroundColor: 'rgba(255, 204, 0, 0.15)', pointerEvents: 'none', zIndex: -1, opacity: 0 };
+
+const commonFace = { 
+    position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden', 
+    borderRadius: '20px', backgroundSize: '100% 100%', border: '1px solid rgba(255,255,255,0.1)' 
+};
+
+const labelNameTop = { 
+    position: 'absolute', top: '25px', left: '50%', transform: 'translateX(-50%)', 
+    background: 'rgba(255, 204, 0, 0.95)', color: '#000', padding: '8px 24px', 
+    borderRadius: '12px', fontWeight: '900', fontSize: '13px', letterSpacing: '1px', boxShadow: '0 4px 15px rgba(0,0,0,0.4)'
+};
+
 const backFaceStyle = { transform: 'rotateY(180deg)' };
-const labelNameTop = { position: 'absolute', top: '15px', left: '50%', transform: 'translateX(-50%)', background: '#ffcc00', color: '#000', padding: '6px 18px', borderRadius: '10px', fontWeight: '900', fontSize: '12px' };
-const backContent = { height: '100%', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', boxSizing: 'border-box' };
-const innerTitleStyle = { color: '#ffcc00', fontSize: '18px', marginBottom: '10px' };
-const descText = { color: '#fff', fontSize: '14px', lineHeight: '1.4' };
-const uiLayer = { position: 'absolute', bottom: isMobile ? '30px' : '60px', textAlign: 'center', width: '100%' };
-const confirmBtnStyle = { padding: '14px 40px', borderRadius: '30px', border: 'none', background: '#ffcc00', color: '#000', fontWeight: '900', fontSize: '15px', cursor: 'pointer' };
+
+const backContent = { 
+    height: '100%', width: '100%', padding: '20px', display: 'flex', 
+    flexDirection: 'column', justifyContent: 'center', alignItems: 'center', 
+    textAlign: 'center', boxSizing: 'border-box' 
+};
+
+const innerTitleStyle = { color: '#ffcc00', fontSize: '22px', marginBottom: '15px', textTransform: 'uppercase' };
+
+const descText = { 
+    color: '#fff', fontSize: '15px', lineHeight: '1.5', width: '85%', 
+    margin: '0 auto', textAlign: 'center' 
+};
+
+const uiLayer = { position: 'absolute', bottom: '60px', textAlign: 'center' };
+const hintText = { color: 'rgba(255,255,255,0.6)', fontSize: '12px', marginBottom: '15px', letterSpacing: '2px' };
+
+const confirmBtnStyle = { 
+    padding: '16px 50px', borderRadius: '35px', border: 'none', 
+    background: 'linear-gradient(45deg, #ffcc00, #ff9900)', color: '#000', 
+    fontWeight: '900', fontSize: '16px', cursor: 'pointer', transition: 'all 0.4s ease',
+    boxShadow: '0 10px 30px rgba(255, 204, 0, 0.4)'
+};
 
 export default ClassSelector;

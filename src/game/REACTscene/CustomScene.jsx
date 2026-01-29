@@ -10,7 +10,6 @@ const FINAL_SCRIPT = (name, className) => [
     { text: "Это — Карта Возможностей. Куда направимся первой?", name: "Котик" }
 ];
 
-// Убедитесь, что setSettings передается в этот компонент из App.jsx
 const CustomScene = ({ settings, setSettings, onAction, onComplete, addToHistory, removeFromHistory, isAuto, isSkip }) => {
     const [phase, setPhase] = useState('name');
     const [playerName, setPlayerName] = useState("");
@@ -36,8 +35,11 @@ const CustomScene = ({ settings, setSettings, onAction, onComplete, addToHistory
     }, [step, isTyping, isSkip, currentScript, onComplete]);
 
     const handleChangeName = () => {
-        setPhase('name');
-        setShowSettings(false);
+        setPhase('name'); setStep(0); setDisplayText(""); setShowSettings(false);
+    };
+
+    const handleChangeClass = () => {
+        setPhase('class'); setStep(0); setDisplayText(""); setShowSettings(false);
     };
 
     useEffect(() => {
@@ -48,10 +50,7 @@ const CustomScene = ({ settings, setSettings, onAction, onComplete, addToHistory
         clearInterval(typingTimer.current);
         let i = 0;
         if (prevStepRef.current === step) i = displayText.length;
-        else {
-            setDisplayText("");
-            setIsTyping(true);
-        }
+        else { setDisplayText(""); setIsTyping(true); }
 
         const speed = isSkip ? 1 : settings.textSpeed;
         typingTimer.current = setInterval(() => {
@@ -71,69 +70,98 @@ const CustomScene = ({ settings, setSettings, onAction, onComplete, addToHistory
     return (
         <div style={{ position: 'absolute', inset: 0, zIndex: 100, pointerEvents: 'auto' }}>
             
-            {phase === 'name' && (
-                <div style={{ position: 'fixed', inset: 0, zIndex: 9999 }}>
-                    <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)' }} />
-                    <NameInput onNameSubmit={(name) => { 
-                        setPlayerName(name); 
-                        if (playerClass) setPhase('finalDialogue');
-                        else setPhase('class');
-                    }} />
+            {(phase === 'name' || phase === 'finalDialogue') && (
+                <div style={{ position: 'absolute', inset: 0 }} onPointerDown={() => phase === 'finalDialogue' && !isAuto && !isSkip && handleNext()}>
+                    
+                    {phase === 'name' && (
+                        <div style={{ position: 'fixed', inset: 0, zIndex: 9999 }}>
+                            <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)' }} />
+                            <NameInput onNameSubmit={(name) => { 
+                                setPlayerName(name); 
+                                if (playerClass) setPhase('finalDialogue'); else setPhase('class');
+                            }} />
+                        </div>
+                    )}
+
                     <div style={dialogBoxStyle}>
-                        <div style={{color: 'gold'}}>Котик</div>
-                        <div>Мяу! Назови себя!</div>
+                        <div style={nameLabelStyle}>
+                            {phase === 'name' ? 'Котик' : currentScript[step].name}
+                        </div>
+                        <div style={{ 
+                            fontSize: `${settings.fontSize}px`, 
+                            lineHeight: 1.4,
+                        }}>
+                            {phase === 'name' ? 'Мяу! Назови себя!' : displayText}
+                        </div>
                     </div>
+
+                    {phase === 'finalDialogue' && (
+                        <ControlPanel 
+                            onAction={(type) => {
+                                if (type === 'back') {
+                                    if (step > 0) { removeFromHistory(); setStep(s => s - 1); }
+                                } else if (type === 'settings') { setShowSettings(true); }
+                                else { onAction(type); }
+                            }} 
+                            states={{ isAuto, isSkip }} 
+                            isTyping={isTyping} 
+                            currentStep={step} 
+                            handleNext={handleNext} 
+                        />
+                    )}
                 </div>
             )}
 
             {phase === 'class' && (
-                <ClassSelector onClassSelect={(selected) => { 
-                    setPlayerClass(selected); 
-                    setPhase('finalDialogue'); 
-                }} />
-            )}
-
-            {phase === 'finalDialogue' && (
-                <div style={{ position: 'absolute', inset: 0 }} onPointerDown={() => !isAuto && !isSkip && handleNext()}>
-                    <div style={dialogBoxStyle}>
-                        <div style={{ color: '#ffcc00', fontWeight: 'bold', marginBottom: '8px' }}>{currentScript[step].name}</div>
-                        <div style={{ fontSize: `${settings.fontSize}px`, lineHeight: 1.4 }}>{displayText}</div>
-                    </div>
-                    <ControlPanel 
-                        onAction={(type) => {
-                            if (type === 'back') {
-                                if (step > 0) {
-                                    removeFromHistory();
-                                    setStep(s => s - 1);
-                                }
-                                // Если step 0, ничего не делаем, не пробрасываем наверх.
-                            } else if (type === 'settings') {
-                                setShowSettings(true);
-                            } else {
-                                onAction(type);
-                            }
-                        }} 
-                        states={{ isAuto, isSkip }} 
-                        isTyping={isTyping} 
-                        currentStep={step} 
-                        handleNext={handleNext} 
-                    />
-                </div>
+                <ClassSelector onClassSelect={(selected) => { setPlayerClass(selected); setPhase('finalDialogue'); }} />
             )}
 
             {showSettings && (
                 <SettingsPanel 
-                    settings={settings} 
-                    setSettings={setSettings} 
+                    settings={settings} setSettings={setSettings} 
                     onClose={() => setShowSettings(false)} 
-                    playerName={playerName}
+                    playerName={playerName.trim() !== "" ? playerName : null}
+                    playerClass={playerClass}
                     onChangeName={handleChangeName}
+                    onChangeClass={playerClass ? handleChangeClass : null}
                 />
             )}
         </div>
     );
 };
 
-const dialogBoxStyle = { position: 'absolute', bottom: '80px', left: '50%', transform: 'translateX(-50%)', width: '92%', maxWidth: '600px', backgroundColor: 'rgba(0,0,0,0.92)', padding: '20px', borderRadius: '12px', color: 'white', border: '1px solid #444', zIndex: 10 };
+// --- СТИЛИ С ПРАВИЛЬНЫМИ ОТСТУПАМИ ---
+
+const dialogBoxStyle = { 
+    position: 'absolute', 
+    bottom: '60px', // Установлено так, чтобы касаться верхней границы ControlPanel
+    left: '50%', 
+    transform: 'translateX(-50%)', 
+    width: '92%', // Возвращаем отступы по бокам
+    maxWidth: '600px', 
+    backgroundColor: 'rgba(20, 20, 20, 0.95)', 
+    padding: '16px 20px', 
+    borderRadius: '12px 12px 0 0', // Скругляем только верх, так как низ прижат к кнопкам
+    color: 'white', 
+    border: '1px solid rgba(255, 255, 255, 0.1)', 
+    borderBottom: 'none', // Убираем нижнюю рамку для бесшовного стыка
+    zIndex: 10,
+    boxShadow: '0 -5px 20px rgba(0,0,0,0.3)',
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: '80px',
+    // Плавный рост при добавлении строк
+    transition: 'all 0.3s ease-out',
+    pointerEvents: 'none'
+};
+
+const nameLabelStyle = { 
+    color: '#ffcc00', 
+    fontWeight: '700', 
+    marginBottom: '6px', 
+    fontSize: '13px', 
+    textTransform: 'uppercase', 
+    letterSpacing: '1px'
+};
 
 export default CustomScene;

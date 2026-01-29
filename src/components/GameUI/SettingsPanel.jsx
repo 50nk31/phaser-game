@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const SettingsPanel = ({ settings, setSettings, onClose, playerName, onChangeName }) => {
+const SettingsPanel = ({ settings, setSettings, onClose, playerName, playerClass, onChangeName, onChangeClass }) => {
+    const [speedStep, setSpeedStep] = useState(11 - Math.round(settings.textSpeed / 10));
     const [tempSettings, setTempSettings] = useState({ ...settings });
     const [previewText, setPreviewText] = useState("");
     const timerRef = useRef(null);
 
-    const fullText = "Так будет выглядеть текст в вашей игре.";
+    const fullText = "Так будет выглядеть текст.";
     
-    const startPreview = (currentSpeed) => {
+    const startPreview = (currentDelay) => {
         if (timerRef.current) clearInterval(timerRef.current);
         setPreviewText("");
         let i = 0;
@@ -15,7 +16,7 @@ const SettingsPanel = ({ settings, setSettings, onClose, playerName, onChangeNam
             i++;
             setPreviewText(fullText.substring(0, i));
             if (i >= fullText.length) clearInterval(timerRef.current);
-        }, currentSpeed);
+        }, currentDelay);
     };
 
     useEffect(() => {
@@ -23,16 +24,22 @@ const SettingsPanel = ({ settings, setSettings, onClose, playerName, onChangeNam
         return () => clearInterval(timerRef.current);
     }, [tempSettings.textSpeed, tempSettings.fontSize]);
 
+    const handleSpeedSlider = (e) => {
+        const step = parseInt(e.target.value);
+        setSpeedStep(step);
+        const newDelay = (11 - step) * 10; 
+        setTempSettings({ ...tempSettings, textSpeed: newDelay });
+    };
+
     const handleApply = (e) => {
         e.stopPropagation();
-        // ПРОВЕРКА: вызываем функцию только если она передана
         if (typeof setSettings === 'function') {
             setSettings(tempSettings);
-        } else {
-            console.error("Ошибка: функция setSettings не передана в SettingsPanel");
         }
         onClose();
     };
+
+    const showCharacterSection = !!(playerName || playerClass);
 
     return (
         <div style={overlayStyle} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
@@ -45,9 +52,7 @@ const SettingsPanel = ({ settings, setSettings, onClose, playerName, onChangeNam
                         <div style={{
                             ...previewBox,
                             fontSize: `${tempSettings.fontSize}px`,
-                            minHeight: '60px',
-                            display: 'flex',
-                            alignItems: 'center'
+                            minHeight: '50px',
                         }}>
                             {previewText}
                         </div>
@@ -56,23 +61,17 @@ const SettingsPanel = ({ settings, setSettings, onClose, playerName, onChangeNam
                     <hr style={divider} />
 
                     <div style={itemStyle}>
-                        <div style={rowStyle}>
-                            <label style={labelStyle}>Скорость текста</label>
-                            <span style={valueStyle}>{tempSettings.textSpeed} мс</span>
-                        </div>
+                        <label style={labelStyle}>Скорость текста</label>
                         <input 
                             style={rangeStyle}
-                            type="range" min="5" max="100" 
-                            value={tempSettings.textSpeed}
-                            onChange={(e) => setTempSettings({...tempSettings, textSpeed: parseInt(e.target.value)})}
+                            type="range" min="1" max="10" step="1"
+                            value={speedStep}
+                            onChange={handleSpeedSlider}
                         />
                     </div>
 
                     <div style={itemStyle}>
-                        <div style={rowStyle}>
-                            <label style={labelStyle}>Размер шрифта</label>
-                            <span style={valueStyle}>{tempSettings.fontSize} px</span>
-                        </div>
+                        <label style={labelStyle}>Размер шрифта</label>
                         <input 
                             style={rangeStyle}
                             type="range" min="14" max="30" 
@@ -81,17 +80,29 @@ const SettingsPanel = ({ settings, setSettings, onClose, playerName, onChangeNam
                         />
                     </div>
 
-                    {playerName && playerName.trim().length > 0 && (
+                    {showCharacterSection && (
                         <>
                             <hr style={divider} />
                             <div style={itemStyle}>
-                                <label style={previewLabel}>ИМЯ ИГРОКА: {playerName}</label>
-                                <button 
-                                    style={changeNameBtn} 
-                                    onClick={onChangeName}
-                                >
-                                    ИЗМЕНИТЬ ИМЯ
-                                </button>
+                                <label style={previewLabel}>ПЕРСОНАЖ</label>
+                                
+                                <div style={infoAreaStyle}>
+                                    {playerName && (
+                                        <div style={infoLine}>Имя: <span style={infoValue}>{playerName}</span></div>
+                                    )}
+                                    {playerClass && (
+                                        <div style={infoLine}>Профессия: <span style={infoValue}>{playerClass.name}</span></div>
+                                    )}
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '5px' }}>
+                                    {playerName && (
+                                        <button style={changeNameBtn} onClick={onChangeName}>ИЗМЕНИТЬ ИМЯ</button>
+                                    )}
+                                    {onChangeClass && (
+                                        <button style={changeClassBtn} onClick={onChangeClass}>СМЕНИТЬ ПРОФЕССИЮ</button>
+                                    )}
+                                </div>
                             </div>
                         </>
                     )}
@@ -103,20 +114,27 @@ const SettingsPanel = ({ settings, setSettings, onClose, playerName, onChangeNam
     );
 };
 
-const overlayStyle = { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center', pointerEvents: 'auto' };
-const windowStyle = { backgroundColor: '#1a1a1a', color: 'white', width: '320px', borderRadius: '12px', display: 'flex', flexDirection: 'column', border: '1px solid #444', overflow: 'hidden' };
-const headerStyle = { padding: '15px', borderBottom: '1px solid #333', textAlign: 'center', fontWeight: 'bold', fontSize: '14px' };
-const contentStyle = { padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' };
-const previewContainer = { display: 'flex', flexDirection: 'column', gap: '8px' };
-const previewLabel = { fontSize: '10px', color: '#888', fontWeight: 'bold' };
-const previewBox = { backgroundColor: '#000', padding: '15px', borderRadius: '8px', color: '#fff', lineHeight: '1.4', border: '1px solid #333' };
+const FONT_STACK = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+const overlayStyle = { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center', pointerEvents: 'auto', fontFamily: FONT_STACK };
+const windowStyle = { backgroundColor: '#1a1a1a', color: 'white', width: '310px', borderRadius: '12px', display: 'flex', flexDirection: 'column', border: '1px solid #333', overflow: 'hidden' };
+const headerStyle = { padding: '15px', borderBottom: '1px solid #333', textAlign: 'center', fontWeight: '600', fontSize: '14px', letterSpacing: '0.5px' };
+const contentStyle = { padding: '20px', display: 'flex', flexDirection: 'column', gap: '18px' };
+const previewContainer = { display: 'flex', flexDirection: 'column', gap: '6px' };
+const previewLabel = { fontSize: '10px', color: '#666', fontWeight: '700', letterSpacing: '0.5px' };
+const previewBox = { backgroundColor: '#000', padding: '12px', borderRadius: '8px', color: '#fff', lineHeight: '1.4', border: '1px solid #222', display: 'flex', alignItems: 'center' };
 const divider = { border: 'none', borderTop: '1px solid #333', margin: '0' };
+
 const itemStyle = { display: 'flex', flexDirection: 'column', gap: '8px' };
-const rowStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
-const labelStyle = { fontSize: '13px', color: '#ccc' };
-const valueStyle = { fontSize: '12px', color: '#028af8', fontWeight: 'bold' };
-const rangeStyle = { cursor: 'pointer', accentColor: '#028af8' };
-const applyBtn = { padding: '18px', background: '#028af8', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' };
-const changeNameBtn = { padding: '10px', background: '#333', color: '#ffcc00', border: '1px solid #444', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', marginTop: '5px' };
+const labelStyle = { fontSize: '14px', color: '#ccc', fontWeight: '500' }; 
+const rangeStyle = { cursor: 'pointer', accentColor: '#028af8', width: '100%' };
+
+const infoAreaStyle = { padding: '2px 0', display: 'flex', flexDirection: 'column', gap: '4px' };
+const infoLine = { fontSize: '14px', color: '#999' }; 
+const infoValue = { color: '#fff', fontWeight: '600' };
+
+const applyBtn = { padding: '15px', background: '#028af8', color: 'white', border: 'none', cursor: 'pointer', fontWeight: '700', fontSize: '14px', pointerEvents: 'auto' };
+const changeNameBtn = { padding: '8px', background: '#2a2a2a', color: '#ffcc00', border: '1px solid #333', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '11px', pointerEvents: 'auto' };
+const changeClassBtn = { ...changeNameBtn, color: '#028af8' };
 
 export default SettingsPanel;

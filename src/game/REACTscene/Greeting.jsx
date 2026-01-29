@@ -59,9 +59,9 @@ const Greeting = ({ settings, onAction, addToHistory, removeFromHistory, onCompl
         
         let i = 0;
         if (prevStepRef.current === step) {
-            i = displayText.length; // Продолжаем с места остановки
+            i = displayText.length; 
         } else {
-            setDisplayText(""); // Новый шаг — сброс
+            setDisplayText(""); 
             setIsTyping(true);
         }
 
@@ -85,13 +85,19 @@ const Greeting = ({ settings, onAction, addToHistory, removeFromHistory, onCompl
         EventBus.emit('update-visuals', { ...line });
 
         return () => clearInterval(typingTimer.current);
-    }, [step, settings.textSpeed, isSkip]);
+    }, [step, settings.textSpeed, isSkip, onComplete, addToHistory, displayText.length, isTyping]);
 
     return (
         <div style={wrapperStyle} onPointerDown={() => !isAuto && !isSkip && handleNext()}>
             <div style={dialogBoxStyle}>
                 {SCRIPT[step].name && <div style={nameStyle}>{SCRIPT[step].name}</div>}
-                <div style={{fontSize: `${settings.fontSize}px`, lineHeight: 1.4}}>{displayText}</div>
+                <div style={{ 
+                    fontSize: `${settings.fontSize}px`, 
+                    lineHeight: 1.4,
+                    transition: 'font-size 0.2s ease'
+                }}>
+                    {displayText}
+                </div>
             </div>
 
             <ControlPanel 
@@ -122,11 +128,73 @@ const Greeting = ({ settings, onAction, addToHistory, removeFromHistory, onCompl
     );
 };
 
-const wrapperStyle = { position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'auto' };
-const dialogBoxStyle = { position: 'absolute', bottom: '80px', left: '50%', transform: 'translateX(-50%)', width: '92%', maxWidth: '600px', backgroundColor: 'rgba(0,0,0,0.85)', padding: '20px', borderRadius: '12px', color: 'white', border: '1px solid rgba(255,255,255,0.2)', pointerEvents: 'auto' };
-const nameStyle = { color: '#ffcc00', fontWeight: 'bold', marginBottom: '8px' };
-const choicesOverlayStyle = { position: 'absolute', inset: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 20 };
-const choicesContainerStyle = { display: 'flex', flexDirection: 'column', gap: '12px', width: '80%', maxWidth: '400px' };
-const btnChoice = { padding: '15px 20px', borderRadius: '10px', background: 'linear-gradient(180deg, #028af8 0%, #026dc5 100%)', color: 'white', fontWeight: 'bold', border: 'none', cursor: 'pointer', fontSize: '16px' };
+// --- СТИЛИ ---
+
+const wrapperStyle = { 
+    position: 'absolute', 
+    inset: 0, 
+    zIndex: 5, 
+    pointerEvents: 'auto' 
+};
+
+const dialogBoxStyle = { 
+    position: 'absolute', 
+    bottom: '60px', // Убран отступ, теперь бабл касается кнопок
+    left: '50%', 
+    transform: 'translateX(-50%)', 
+    width: '92%', // Вернул отступы по бокам
+    maxWidth: '600px', 
+    backgroundColor: 'rgba(20, 20, 20, 0.95)', // Чуть темнее для глубины
+    padding: '16px 20px', 
+    borderRadius: '12px 12px 0 0', // Скругление только сверху
+    color: 'white', 
+    border: '1px solid rgba(255, 255, 255, 0.1)', 
+    borderBottom: 'none', // Бесшовный стык
+    zIndex: 10,
+    boxShadow: '0 -5px 20px rgba(0,0,0,0.3)',
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: '80px',
+    transition: 'all 0.3s ease-out', // Плавное расширение при новой строке
+    pointerEvents: 'none' 
+};
+
+const nameStyle = { 
+    color: '#ffcc00', 
+    fontWeight: '700', 
+    marginBottom: '6px', 
+    fontSize: '13px', 
+    textTransform: 'uppercase', 
+    letterSpacing: '1px' 
+};
+
+const choicesOverlayStyle = { 
+    position: 'absolute', 
+    inset: 0, 
+    display: 'flex', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    zIndex: 20 
+};
+
+const choicesContainerStyle = { 
+    display: 'flex', 
+    flexDirection: 'column', 
+    gap: '12px', 
+    width: '80%', 
+    maxWidth: '400px' 
+};
+
+const btnChoice = { 
+    padding: '15px 20px', 
+    borderRadius: '10px', 
+    background: 'linear-gradient(180deg, #028af8 0%, #026dc5 100%)', 
+    color: 'white', 
+    fontWeight: 'bold', 
+    border: 'none', 
+    cursor: 'pointer', 
+    fontSize: '16px' 
+};
 
 export default Greeting;
